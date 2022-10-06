@@ -26,4 +26,4 @@ Run:
 Publish:
 
 SET GOPROXY=proxy.golang.org 
-go list -m github.com/zeroboo/gin-request-limitter@v0.3.0
+go list -m github.com/zeroboo/gin-request-limitter@[VERSION]
