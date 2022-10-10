@@ -79,7 +79,10 @@ func TestLimitter_ValidGETRequest_Correct(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler("testUser"),
-		CreateDatastoreBackedLimitter(dsClient, TEST_REQUEST_TRACKER_DATASTORE_KIND, GetUserIdFromContextByField("userId"), 200),
+		CreateDatastoreBackedLimitter(dsClient,
+			TEST_REQUEST_TRACKER_DATASTORE_KIND,
+			GetUserIdFromContextByField("userId"),
+			200, 60000, 10),
 		HandleHealth,
 	)
 
@@ -89,7 +92,10 @@ func TestLimitter_ValidGETRequest_Correct(t *testing.T) {
 
 var testHandlersSet []gin.HandlerFunc = []gin.HandlerFunc{
 	CreateFakeAuthenticationHandler("testUser"),
-	CreateDatastoreBackedLimitter(dsClient, TEST_REQUEST_TRACKER_DATASTORE_KIND, GetUserIdFromContextByField("userId"), 200),
+	CreateDatastoreBackedLimitter(dsClient,
+		TEST_REQUEST_TRACKER_DATASTORE_KIND,
+		GetUserIdFromContextByField("userId"),
+		200, 60000, 10),
 	HandleHealth,
 }
 
@@ -101,7 +107,10 @@ func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(userId),
-		CreateDatastoreBackedLimitter(dsClient, TEST_REQUEST_TRACKER_DATASTORE_KIND, GetUserIdFromContextByField("userId"), 200),
+		CreateDatastoreBackedLimitter(dsClient,
+			TEST_REQUEST_TRACKER_DATASTORE_KIND,
+			GetUserIdFromContextByField("userId"),
+			200, 60000, 10),
 		HandleHealth,
 	)
 
@@ -113,7 +122,10 @@ func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(userId),
-		CreateDatastoreBackedLimitter(dsClient, TEST_REQUEST_TRACKER_DATASTORE_KIND, GetUserIdFromContextByField("userId"), 200),
+		CreateDatastoreBackedLimitter(dsClient,
+			TEST_REQUEST_TRACKER_DATASTORE_KIND,
+			GetUserIdFromContextByField("userId"),
+			200, 60000, 10),
 		HandleHealth,
 	)
 
@@ -129,7 +141,8 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(userId),
-		CreateDatastoreBackedLimitter(dsClient, TEST_REQUEST_TRACKER_DATASTORE_KIND, GetUserIdFromContextByField("userId"), interval),
+		CreateDatastoreBackedLimitter(dsClient, TEST_REQUEST_TRACKER_DATASTORE_KIND, GetUserIdFromContextByField("userId"),
+			interval, 0, 0),
 		HandleHealth,
 	)
 
@@ -141,7 +154,10 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(userId),
-		CreateDatastoreBackedLimitter(dsClient, TEST_REQUEST_TRACKER_DATASTORE_KIND, GetUserIdFromContextByField("userId"), interval),
+		CreateDatastoreBackedLimitter(dsClient,
+			TEST_REQUEST_TRACKER_DATASTORE_KIND,
+			GetUserIdFromContextByField("userId"),
+			interval, 0, 0),
 		HandleHealth,
 	)
 

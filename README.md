@@ -8,22 +8,40 @@ Request limitter as middleware for gin-gonic framework: limit requests can be ac
     User can not send too many requests in a time window. 
     Implement Fixed windows algorithm using Redis or Google Firestore as persistence.
 # Usage
-Install
+* Install
 ```console
 go get github.com/zeroboo/gin-request-limitter
 ```
-Run:
+* Run:
 ```go
 
-	dsClient, _ := datastore.NewClient(context.Background(), datastoreProjectId, option.WithCredentialsFile(serviceAccount))
+ctx := context.Background()
+dsClient, _ := datastore.NewClient(ctx, datastoreProjectId, option.WithCredentialsFile(serviceAccount))
   
-  handler:=CreateDatastoreBackedLimitter(dsClient, TEST_REQUEST_TRACKER_DATASTORE_KIND, GetUserIdFromContextByField("userId"), 200),
+/*
+Create a limitter middleware per user:
+  persists data to kind 'tracker' in datastore
+  collect userId from gin context by field 'userId'
+  restricts request only send to 200 milis after the last one
+  restricts maximum 100 requests per 60 seconds
+*/
+handler := CreateDatastoreBackedLimitter(dsClient,
+  "tracker",
+  GetUserIdFromContextByField("userId"), 
+  200, 
+  60000, 
+  100),
   
-  //use handler ...
-
+//use handler ...
 ```
 
-Publish:
+* Test: 
+```console
+go test -timeout 30s github.com/zeroboo/gin-request-limitter -v
+```
+* Publish:  
 
+```console
 SET GOPROXY=proxy.golang.org 
 go list -m github.com/zeroboo/gin-request-limitter@[VERSION]
+```
