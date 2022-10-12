@@ -143,11 +143,13 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 			tracker.UpdateRequest(time.Now(), config.WindowSize)
 			var savedKey *datastore.Key
 			savedKey, errTracker = client.Put(ctx, trackerKey, &tracker)
+
 			if errTracker != nil {
-				log.Infof("put tracker failed: userId=%v, key=%v, error=%v", userId, trackerKey, errTracker)
+				log.Infof("PutTracker: Failed, userId=%v, key=%v, error=%v", userId, trackerKey, errTracker)
 			}
+
 			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Infof("put tracker done: userId=%v, key=%v, error=%v", userId, savedKey, errTracker)
+				log.Infof("PutTracker: Finish, userId=%v, key=%v, error=%v", userId, savedKey, errTracker)
 			}
 		}
 		ProcessValidateResult(validateResult, c)
