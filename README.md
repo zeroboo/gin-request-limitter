@@ -5,14 +5,15 @@ Request limitter as middleware for gin-gonic framework: limit requests can be ac
 # Features:
   - Limit request interval: user can not send request too fast
   - Limit request freequently:
-    User can not send too many requests in a time window. 
-    Implement Fixed windows algorithm using Redis or Google Firestore as persistence.
+    - User can not send too many requests in a time window. 
+    - Implement Fixed windows algorithm using Redis or Google Firestore as  persistence.
 # Usage
 * Install
 ```console
 go get github.com/zeroboo/gin-request-limitter
 ```
-* Run:
+* Run
+
 ```go
 
 ctx := context.Background()
@@ -35,12 +36,16 @@ handler := CreateDatastoreBackedLimitter(dsClient,
 //use handler ...
 ```
 
-* Test: 
+* Test
 ```console
-go test -timeout 30s github.com/zeroboo/gin-request-limitter -v
+go test -timeout 60s github.com/zeroboo/gin-request-limitter -v
 ```
-* Publish:  
-
+* Publish  
+  - Current version is 0.0.3
+  - Tag and push to with VERSION 
+```console
+```
+  - Publish go package 
 ```console
 SET GOPROXY=proxy.golang.org 
 go list -m github.com/zeroboo/gin-request-limitter@[VERSION]

@@ -4,18 +4,19 @@ import "time"
 
 // ----------------------------------------------------------------------------------------------------
 type RequestTracker struct {
-	UserId string
-	Url    string
+	UID    string
+	URL    string
 	Window int64
 
 	//Calls of request in current window
 	WindowCount int64
 	//Last time request in millisec
-	LastCall int64
+	LastCall   int64
+	Expiration time.Time
 }
 
 const DEFAULT_REQUEST_TRACKING_WINDOW_MILIS int64 = 60000
-const SESSION_EXPIRATION_SECONDS int64 = 24 * 3600
+const SESSION_EXPIRATION_SECONDS int64 = 3600
 
 func (tracker *RequestTracker) UpdateWindow(currentTime int64, windowMilis int64) {
 	if windowMilis > 0 {
@@ -30,11 +31,12 @@ func (tracker *RequestTracker) UpdateWindow(currentTime int64, windowMilis int64
 
 func (tracker *RequestTracker) UpdateRequest(currentTime time.Time, windowFrameMilis int64) {
 	if windowFrameMilis > 0 {
-		tracker.UpdateWindow(currentTime.Unix(), windowFrameMilis)
+		tracker.UpdateWindow(currentTime.UnixMilli(), windowFrameMilis)
 		tracker.WindowCount += 1
 	}
 
 	tracker.LastCall = currentTime.UnixMilli()
+	tracker.Expiration = time.Now().Add(time.Duration(SESSION_EXPIRATION_SECONDS) * time.Second)
 }
 
 func (tracker *RequestTracker) IsRequestTooFast(currentTime time.Time, requestMinIntervalMilis int64) bool {
