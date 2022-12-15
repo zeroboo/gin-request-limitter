@@ -24,7 +24,7 @@ import (
 
 var dsClient *datastore.Client
 
-const DatastoreKindRequestTracker = "test_request_trackers"
+const DatastoreKindRequestTracker string = "test_request_trackers"
 const FieldNameUserId string = "userId"
 
 func TestMain(m *testing.M) {
@@ -136,7 +136,7 @@ func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 
 // go test -timeout 30s -run ^TestLimitter_MultiRequestNotTooFast_Success$ github.com/zeroboo/gin-request-limitter -v
 func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
-	userId := "test-too-fast"
+	userId := fmt.Sprintf("test-too-fast-%v", time.Now().UnixMilli())
 	interval := int64(200)
 	recorder := RecordRequest(http.MethodGet,
 		"/health",
@@ -150,6 +150,8 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, recorder.Code, "First response success")
 	assert.Equal(t, "OK", recorder.Body.String(), "First response body OK")
+
+	//Second request that respect interval restriction
 	time.Sleep(time.Millisecond * time.Duration(interval+100))
 	recorder2 := RecordRequest(http.MethodGet,
 		"/health",
@@ -163,12 +165,12 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 		HandleHealth,
 	)
 
-	assert.Equal(t, http.StatusOK, recorder2.Code, "Second response's code is success ")
+	assert.Equal(t, http.StatusOK, recorder2.Code, "Second response's code is success  ")
 }
 
 // go test -timeout 30s -run ^TestLimitter_TooFrequentlyRequests_ResponseError$ github.com/zeroboo/gin-request-limitter -v
 func TestLimitter_TooFrequentlyRequests_ResponseError(t *testing.T) {
-	userId := "test-too-fast"
+	userId := fmt.Sprintf("test-too-fast-%v", time.Now().Unix())
 	interval := int64(10)
 	limitter := CreateDatastoreBackedLimitter(dsClient, DatastoreKindRequestTracker,
 		GetUserIdFromContextByField("userId"),
@@ -206,6 +208,7 @@ func TestLimitterTooFreequently_NewWindow_RequestSuccess(t *testing.T) {
 		GetUserIdFromContextByField("userId"),
 		interval, windowSize, 1)
 	authHandler := CreateFakeAuthenticationHandler(FieldNameUserId, userId)
+
 	recorder := RecordRequest(http.MethodGet,
 		"/health",
 		map[string][]string{},
@@ -216,7 +219,6 @@ func TestLimitterTooFreequently_NewWindow_RequestSuccess(t *testing.T) {
 	)
 	assert.Equal(t, http.StatusOK, recorder.Code, "First response success")
 	assert.Equal(t, "OK", recorder.Body.String(), "First response body OK")
-	time.Sleep(time.Millisecond * time.Duration(interval+100))
 
 	recorder2 := RecordRequest(http.MethodGet,
 		"/health",
@@ -228,7 +230,8 @@ func TestLimitterTooFreequently_NewWindow_RequestSuccess(t *testing.T) {
 	)
 	assert.Equal(t, http.StatusTooManyRequests, recorder2.Code, "Second response's code failed cause it too freequently")
 
-	time.Sleep(time.Millisecond * time.Duration(windowSize*2))
+	//Sleep to next time window
+	time.Sleep(time.Millisecond * time.Duration(windowSize+100))
 	recorder3 := RecordRequest(http.MethodGet,
 		"/health",
 		map[string][]string{},

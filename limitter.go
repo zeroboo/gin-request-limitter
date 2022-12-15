@@ -14,7 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// Extract userId from a context by field "userId"
+// GetUserIdFromContextByField extracts userId from a gin context by property name
 func GetUserIdFromContextByField(userIdField string) func(c *gin.Context) string {
 	return func(c *gin.Context) string {
 		return c.GetString(userIdField)
@@ -36,6 +36,10 @@ type LimitterConfig struct {
 
 	//Max requests per window
 	WindowRequestMax int64
+
+	//If true, error when save/load tracker will abort request
+	//If false, request will be served even if save/load tracker error
+	AbortOnTrackerFailed bool
 }
 
 var ErrorRequestTooFast = fmt.Errorf("request is too fast")
@@ -92,6 +96,15 @@ func CreateTrackerName(userId string, url string) string {
 	return hashValue
 }
 
+// LoadUserTracker returns a tracker
+func LoadUserTracker(client *datastore.Client, trackerKind string, url string, userId string) (*datastore.Key, *RequestTracker, error) {
+	var tracker RequestTracker = RequestTracker{}
+	trackerName := CreateTrackerName(userId, url)
+	trackerKey := datastore.NameKey(trackerKind, trackerName, nil)
+	errTracker := client.Get(context.TODO(), trackerKey, &tracker)
+	return trackerKey, &tracker, errTracker
+}
+
 /*
 CreateDatastoreBackedLimitter returns a limitter with given config as middleware.
 
@@ -123,22 +136,19 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 		userId := getUserIdFromContext(c)
 		url := c.Request.URL.Path
 
-		// Creates a Key instance.
-		trackerName := CreateTrackerName(userId, url)
-		trackerKey := datastore.NameKey(trackerKind, trackerName, nil)
-		//trackerKey := datastore.NameKey(trackerKind, keyRaw, nil)
-		ctx := context.TODO()
-
-		//Load tracker if needed
-		tracker := RequestTracker{}
-		errTracker := client.Get(ctx, trackerKey, &tracker)
+		//Load tracker
+		trackerKey, tracker, errTracker := LoadUserTracker(client, trackerKind, url, userId)
 		var errValidate error
 		if errTracker != nil {
 			if errTracker == datastore.ErrNoSuchEntity {
-				//Handle error: No session found, create new
-				tracker.UID = userId
-				tracker.URL = url
+				//This error it not critical, bypass it
 				errTracker = nil
+
+				//Handle error: No session found, create new
+				tracker = &RequestTracker{
+					UID: userId,
+					URL: url,
+				}
 				if log.IsLevelEnabled(log.TraceLevel) {
 					log.Tracef("RequestLimitter: TrackerNotFound, UID=%v, url=%v, key=%v", userId, url, trackerKey)
 				}
@@ -146,11 +156,10 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 		}
 
 		if errTracker == nil {
-			if log.IsLevelEnabled(log.DebugLevel) {
-				log.Debugf("RequestLimitter: loadedTracker=%v", tracker)
+			if log.IsLevelEnabled(log.TraceLevel) {
+				log.Tracef("RequestLimitter: LoadedTracker=%v", tracker)
 			}
-
-			errValidate = ValidateRequest(&tracker, time.Now(), url, c.ClientIP(), config)
+			errValidate = ValidateRequest(tracker, time.Now(), url, c.ClientIP(), config)
 		} else {
 
 			//Error occur, log error and quit tracker
@@ -160,9 +169,8 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 		}
 
 		if errValidate == nil {
-
 			var savedKey *datastore.Key
-			savedKey, errTracker = client.Put(ctx, trackerKey, &tracker)
+			savedKey, errTracker = client.Put(context.Background(), trackerKey, tracker)
 
 			if errTracker != nil {
 				log.Errorf("RequestLimitter: UpdateTrackerFailed, UID=%v, key=%v, error=%v", userId, trackerKey, errTracker)

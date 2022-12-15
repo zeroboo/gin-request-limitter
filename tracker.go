@@ -26,7 +26,6 @@ func (tracker *RequestTracker) UpdateWindow(currentTime int64, windowMilis int64
 			tracker.WindowCount = 0
 		}
 	}
-
 }
 
 func (tracker *RequestTracker) UpdateRequest(currentTime time.Time, windowFrameMilis int64) {
