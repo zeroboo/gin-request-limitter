@@ -29,13 +29,13 @@ const MIN_REQUEST_INTERVAL_MILIS int64 = 200
 
 type LimitterConfig struct {
 	//Time between 2 requests in milisecs. 0 means no limit
-	RequestInterval int64
+	MinRequestInterval int64
 
 	//Window frame in milisec. Value 0 means no limit
 	WindowSize int64
 
 	//Max requests per window
-	WindowRequestMax int64
+	MaxRequestPerWindow int64
 
 	//If true, error when save/load tracker will abort request
 	//If false, request will be served even if save/load tracker error
@@ -54,9 +54,9 @@ func ValidateRequest(tracker *RequestTracker,
 	requestClientIP string,
 	limitterConfig LimitterConfig) error {
 
-	if limitterConfig.RequestInterval > 0 {
-		if tracker.IsRequestTooFast(currentTime, limitterConfig.RequestInterval) {
-			log.Infof("InvalidRequest: TooFast, ID=%v, url=%v, IP=%v, elapse=%v", tracker.UID, requestURL, requestClientIP, currentTime.UnixMilli()-tracker.LastCall)
+	if limitterConfig.MinRequestInterval > 0 {
+		if tracker.IsRequestTooFast(currentTime, limitterConfig.MinRequestInterval) {
+			//log.Infof("InvalidRequest: TooFast, ID=%v, url=%v, IP=%v, elapse=%v", tracker.UID, requestURL, requestClientIP, currentTime.UnixMilli()-tracker.LastCall)
 			return ErrorRequestTooFast
 		}
 	}
@@ -64,8 +64,8 @@ func ValidateRequest(tracker *RequestTracker,
 	//log.Printf("WindowSize=%v, callLimit=%v", limitterConfig.WindowSize, limitterConfig.WindowRequestMax)
 	tracker.UpdateRequest(time.Now(), limitterConfig.WindowSize)
 	if limitterConfig.WindowSize > 0 {
-		if tracker.IsRequestTooFrequently(currentTime, limitterConfig.WindowRequestMax) {
-			log.Infof("InvalidRequest: TooMany, ID=%v, url=%v, IP=%v, window=%v, windowCount=%v", tracker.UID, requestURL, requestClientIP, tracker.Window, tracker.WindowCount)
+		if tracker.IsRequestTooFrequently(currentTime, limitterConfig.MaxRequestPerWindow) {
+			//log.Infof("InvalidRequest: TooMany, ID=%v, url=%v, IP=%v, window=%v, windowCount=%v", tracker.UID, requestURL, requestClientIP, tracker.Window, tracker.WindowCount)
 			return ErrorRequestTooFreequently
 		}
 	}
@@ -127,10 +127,16 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 	getUserIdFromContext func(c *gin.Context) string,
 	minRequestIntervalMilis int64, windowFrameMilis int64, maxRequestInWindow int) func(c *gin.Context) {
 	config := LimitterConfig{
-		RequestInterval:  minRequestIntervalMilis,
-		WindowSize:       windowFrameMilis,
-		WindowRequestMax: int64(maxRequestInWindow),
+		MinRequestInterval:  minRequestIntervalMilis,
+		WindowSize:          windowFrameMilis,
+		MaxRequestPerWindow: int64(maxRequestInWindow),
 	}
+	log.Infof("CreateDatastoreBackedLimitter: DatastoreKind=%v, minRequestInterval=%v, WindowsSize=%v, MaxRequestPerWindow=%v",
+		trackerKind,
+		config.MinRequestInterval,
+		config.WindowSize,
+		config.MaxRequestPerWindow,
+	)
 	return func(c *gin.Context) {
 		// Sets the name/ID for the new entity.
 		userId := getUserIdFromContext(c)
@@ -168,28 +174,29 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 			return
 		}
 
+		var savedKey *datastore.Key
 		if errValidate == nil {
-			var savedKey *datastore.Key
 			savedKey, errTracker = client.Put(context.Background(), trackerKey, tracker)
-
 			if errTracker != nil {
 				log.Errorf("RequestLimitter: UpdateTrackerFailed, UID=%v, key=%v, error=%v", userId, trackerKey, errTracker)
 				c.Next()
 				return
 			}
 
-			if log.IsLevelEnabled(log.TraceLevel) {
-				log.Tracef("RequestLimitter: UpdateTrackerSuccess, UID=%v, key=%v, error=%v", userId, savedKey, errTracker)
-			}
 		}
 		processValidateResult(errValidate, c)
 
 		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("ValidateRequest: Done, UID=%v, url=%v, ip=%v, errValidate=%v, errTracker=%v, lastCallElapse=%v, window=%v, windowCalls=%v",
-				tracker.UID, url, c.ClientIP(), errValidate, errTracker,
-				time.Now().UnixMilli()-tracker.LastCall,
+			log.Tracef("ValidateRequest: Done, UID=%v, url=%v, ip=%v, errValidate=%v, errTracker=%v, sinceLastCall=%v|%v, window=%v, windowCalls=%v|%v, saved=%v",
+				tracker.UID,
+				url,
+				c.ClientIP(),
+				errValidate,
+				errTracker,
+				time.Now().UnixMilli()-tracker.LastCall, config.MinRequestInterval,
 				tracker.Window,
-				tracker.WindowCount,
+				tracker.WindowCount, config.MaxRequestPerWindow,
+				savedKey != nil,
 			)
 		}
 	}
