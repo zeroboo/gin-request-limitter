@@ -41,7 +41,7 @@ handler := CreateDatastoreBackedLimitter(dsClient,
 go test -timeout 60s github.com/zeroboo/gin-request-limitter -v
 ```
 * Publish  
-  - Current version is v0.0.8
+  - Current version is v0.0.9
   - Tag and push to with VERSION 
 ```console
 ```

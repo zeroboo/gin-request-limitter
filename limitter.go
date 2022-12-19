@@ -187,14 +187,13 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 		processValidateResult(errValidate, c)
 
 		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("ValidateRequest: Done, UID=%v, url=%v, ip=%v, errValidate=%v, errTracker=%v, sinceLastCall=%v|%v, window=%v, windowCalls=%v|%v, saved=%v",
+			log.Tracef("ValidateRequest: Done, UID=%v, url=%v, ip=%v, errValidate=%v, errTracker=%v, fastCall=%v|%v, windowCalls=%v|%v, saved=%v",
 				tracker.UID,
 				url,
 				c.ClientIP(),
 				errValidate,
 				errTracker,
 				time.Now().UnixMilli()-tracker.LastCall, config.MinRequestInterval,
-				tracker.Window,
 				tracker.WindowCount, config.MaxRequestPerWindow,
 				savedKey != nil,
 			)
