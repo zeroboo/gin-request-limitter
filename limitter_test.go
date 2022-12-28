@@ -243,6 +243,12 @@ func TestLimitterTooFreequently_NewWindow_RequestSuccess(t *testing.T) {
 	assert.Equal(t, http.StatusOK, recorder3.Code, "Third request as next window, must be success")
 }
 
+// go test -timeout 30s -run ^TestUpdateTracker_WindowsIncreased$ github.com/zeroboo/gin-request-limitter -v
+func TestUpdateTracker_WindowsIncreased(t *testing.T) {
+	var tracker RequestTracker = *CreateRequestTracker("uid", "url", time.Now().Add(100*time.Second))
+	//tracker.UpdateRequest(time.Now)
+}
+
 // CreateRequest return a forged http request
 func CreateRequest(method string, urlPath string, headers map[string][]string, params map[string][]string) *http.Request {
 	requestParams := url.Values{}

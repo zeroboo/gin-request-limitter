@@ -4,38 +4,53 @@ import "time"
 
 // ----------------------------------------------------------------------------------------------------
 type RequestTracker struct {
-	UID    string
-	URL    string
-	Window int64
+	UID string
+	URL string
 
-	//Calls of request in current window
-	WindowCount int64
+	//WindowNum is index of current window
+	WindowNum int64
+
+	//WindowRequest is calls of request in current window
+	WindowRequest int64
 	//Last time request in millisec
-	LastCall   int64
+	LastCall int64
+
+	//Expiration is time when this tracker expired
 	Expiration time.Time
 }
 
-const DEFAULT_REQUEST_TRACKING_WINDOW_MILIS int64 = 60000
-const SESSION_EXPIRATION_SECONDS int64 = 3600
+const DefaultREquestTrackingWindowMilis int64 = 60000
 
-func (tracker *RequestTracker) UpdateWindow(currentTime int64, windowMilis int64) {
+func CreateRequestTracker(uid string, url string, expiration time.Time) *RequestTracker {
+	var tracker RequestTracker = RequestTracker{
+		UID:           uid,
+		URL:           url,
+		Expiration:    expiration,
+		LastCall:      0,
+		WindowNum:     0,
+		WindowRequest: 0,
+	}
+	return &tracker
+}
+
+func (tracker *RequestTracker) UpdateWindow(currentTime time.Time, windowMilis int64) {
 	if windowMilis > 0 {
-		currentWindow := currentTime / windowMilis
-		if currentWindow > tracker.Window {
-			tracker.Window = currentWindow
-			tracker.WindowCount = 0
+		currentWindow := currentTime.UnixMilli() / windowMilis
+		if currentWindow != tracker.WindowNum {
+			tracker.WindowNum = currentWindow
+			tracker.WindowRequest = 0
 		}
 	}
 }
 
-func (tracker *RequestTracker) UpdateRequest(currentTime time.Time, windowFrameMilis int64) {
+func (tracker *RequestTracker) UpdateRequest(currentTime time.Time, windowFrameMilis int64, expiration time.Time) {
 	if windowFrameMilis > 0 {
-		tracker.UpdateWindow(currentTime.UnixMilli(), windowFrameMilis)
-		tracker.WindowCount += 1
+		tracker.UpdateWindow(currentTime, windowFrameMilis)
+		tracker.WindowRequest += 1
 	}
 
 	tracker.LastCall = currentTime.UnixMilli()
-	tracker.Expiration = time.Now().Add(time.Duration(SESSION_EXPIRATION_SECONDS) * time.Second)
+	tracker.Expiration = expiration
 }
 
 func (tracker *RequestTracker) IsRequestTooFast(currentTime time.Time, requestMinIntervalMilis int64) bool {
@@ -46,5 +61,5 @@ func (tracker *RequestTracker) IsRequestTooFast(currentTime time.Time, requestMi
 }
 
 func (tracker *RequestTracker) IsRequestTooFrequently(currentTime time.Time, maxRequestPerWindow int64) bool {
-	return tracker.WindowCount > maxRequestPerWindow
+	return tracker.WindowRequest > maxRequestPerWindow
 }

@@ -40,13 +40,3 @@ handler := CreateDatastoreBackedLimitter(dsClient,
 ```console
 go test -timeout 60s github.com/zeroboo/gin-request-limitter -v
 ```
-* Publish  
-  - Current version is v0.0.9
-  - Tag and push to with VERSION 
-```console
-```
-  - Publish go package 
-```console
-SET GOPROXY=proxy.golang.org 
-go list -m github.com/zeroboo/gin-request-limitter@[VERSION]
-```
