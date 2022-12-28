@@ -64,7 +64,7 @@ func ValidateRequest(tracker *RequestTracker,
 	}
 
 	//log.Printf("WindowSize=%v, callLimit=%v", limitterConfig.WindowSize, limitterConfig.WindowRequestMax)
-	tracker.UpdateRequest(time.Now(), limitterConfig.WindowSize, limitterConfig.CreateExpiration(time.Now()))
+	tracker.UpdateRequest(time.Now(), &limitterConfig)
 
 	if limitterConfig.WindowSize > 0 {
 		if tracker.IsRequestTooFrequently(currentTime, limitterConfig.MaxRequestPerWindow) {
@@ -100,11 +100,12 @@ func CreateTrackerName(userId string, url string) string {
 }
 
 // LoadUserTracker returns a tracker
-func LoadUserTracker(client *datastore.Client, trackerKind string, url string, userId string) (*datastore.Key, *RequestTracker, error) {
+func LoadUserTracker(Client *datastore.Client, TrackerKind string, URL string, UserId string) (*datastore.Key, *RequestTracker, error) {
 	var tracker RequestTracker = RequestTracker{}
-	trackerName := CreateTrackerName(userId, url)
-	trackerKey := datastore.NameKey(trackerKind, trackerName, nil)
-	errTracker := client.Get(context.TODO(), trackerKey, &tracker)
+	trackerName := CreateTrackerName(UserId, URL)
+	trackerKey := datastore.NameKey(TrackerKind, trackerName, nil)
+	errTracker := Client.Get(context.TODO(), trackerKey, &tracker)
+
 	return trackerKey, &tracker, errTracker
 }
 
@@ -118,41 +119,9 @@ func (config *LimitterConfig) CreateExpiration(Now time.Time) time.Time {
 
 	return Now.Add(time.Duration(expSec) * time.Second)
 }
-
-/*
-CreateDatastoreBackedLimitter returns a limitter with given config as middleware.
-
-Limitter aborts gin context if validating failed.
-If limitter has internal error, it will leaves the context run by calling c.Next()
-Params:
-
-  - trackerKind: Kind of tracker in datastore
-
-  - GetUserIdFromContext: Function to extract userid from a gin context
-
-  - minRequestIntervalMilis: Minimum time between 2 requests, 0 means no limit
-
-  - windowFrameMilis: Window frame in miliseconds, 0 means no limit
-
-  - maxRequestInWindow: Max request in a window frame
-*/
-func CreateDatastoreBackedLimitter(client *datastore.Client,
-	trackerKind string,
+func CreateDatastoreBackedLimitterFromConfig(client *datastore.Client, trackerKind string,
 	getUserIdFromContext func(c *gin.Context) string,
-	minRequestIntervalMilis int64,
-	windowFrameMilis int64,
-	maxRequestInWindow int) func(c *gin.Context) {
-	config := LimitterConfig{
-		MinRequestInterval:  minRequestIntervalMilis,
-		WindowSize:          windowFrameMilis,
-		MaxRequestPerWindow: int64(maxRequestInWindow),
-	}
-	log.Infof("CreateDatastoreBackedLimitter: DatastoreKind=%v, minRequestInterval=%v, WindowsSize=%v, MaxRequestPerWindow=%v",
-		trackerKind,
-		config.MinRequestInterval,
-		config.WindowSize,
-		config.MaxRequestPerWindow,
-	)
+	config *LimitterConfig) func(c *gin.Context) {
 	return func(c *gin.Context) {
 		// Sets the name/ID for the new entity.
 		userId := getUserIdFromContext(c)
@@ -167,7 +136,7 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 				errTracker = nil
 
 				//Handle error: No session found, create new
-				tracker = CreateRequestTracker(userId, url, config.CreateExpiration(time.Now()))
+				tracker = CreateNewRequestTracker(userId, url, config.CreateExpiration(time.Now()))
 
 				if log.IsLevelEnabled(log.TraceLevel) {
 					log.Tracef("RequestLimitter: TrackerNotFound, UID=%v, url=%v, key=%v", userId, url, trackerKey)
@@ -200,18 +169,59 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 		processValidateResult(errValidate, c)
 
 		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("ValidateRequest: Done, UID=%v, url=%v, ip=%v, errValidate=%v, errTracker=%v, fastCall=%v|%v, windowCalls=%v|%v|%v, saved=%v",
+			log.Tracef("RequestLimitter: ValidateFinish, UID=%v, url=%v, IP=%v, calls=%v|%v, window=%v/%v|%v, saved=%v, errValidate=%v, errTracker=%v",
 				tracker.UID,
 				url,
 				c.ClientIP(),
-				errValidate,
-				errTracker,
 				time.Now().UnixMilli()-tracker.LastCall, config.MinRequestInterval,
 				tracker.WindowRequest, config.MaxRequestPerWindow, tracker.WindowNum,
 				savedKey != nil,
+				errValidate,
+				errTracker,
 			)
 		}
 	}
+}
+
+/*
+CreateDatastoreBackedLimitter returns a limitter with given config as middleware.
+
+Limitter aborts gin context if validating failed.
+If limitter has internal error, it will leaves the context run by calling c.Next()
+Params:
+
+  - trackerKind: Kind of tracker in datastore
+
+  - GetUserIdFromContext: Function to extract userid from a gin context
+
+  - minRequestIntervalMilis: Minimum time between 2 requests, 0 means no limit
+
+  - windowFrameMilis: Window frame in miliseconds, 0 means no limit
+
+  - maxRequestInWindow: Max request in a window frame
+*/
+func CreateDatastoreBackedLimitter(client *datastore.Client,
+	trackerKind string,
+	getUserIdFromContext func(c *gin.Context) string,
+	minRequestIntervalMilis int64,
+	windowFrameMilis int64,
+	maxRequestInWindow int,
+	sessionExpirationSeconds int64) func(c *gin.Context) {
+	config := LimitterConfig{
+		MinRequestInterval:       minRequestIntervalMilis,
+		WindowSize:               windowFrameMilis,
+		MaxRequestPerWindow:      int64(maxRequestInWindow),
+		SessionExpirationSeconds: sessionExpirationSeconds,
+	}
+	log.Infof("CreateDatastoreBackedLimitter: DatastoreKind=%v, minRequestInterval=%v, WindowsSize=%v, MaxRequestPerWindow=%v, SessionExpirationSeconds=%v",
+		trackerKind,
+		config.MinRequestInterval,
+		config.WindowSize,
+		config.MaxRequestPerWindow,
+		config.SessionExpirationSeconds,
+	)
+
+	return CreateDatastoreBackedLimitterFromConfig(client, trackerKind, getUserIdFromContext, &config)
 }
 
 // ValidateGinRequest

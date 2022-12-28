@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 	//Init tests
 	var errDatastore error
 	dsClient, errDatastore = datastore.NewClient(context.Background(), datastoreProjectId, option.WithCredentialsFile(serviceAccount))
-	log.Printf("Init datastore: projec tId=%v, error=%v, ", datastoreProjectId, errDatastore)
+	log.Printf("Init datastore: projectId=%v, error=%v, ", datastoreProjectId, errDatastore)
 	CleanupTestData()
 	//Run all tests
 	exitCode := m.Run()
@@ -84,7 +84,7 @@ func TestLimitter_ValidGETRequest_Correct(t *testing.T) {
 		CreateDatastoreBackedLimitter(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField(FieldNameUserId),
-			200, 60000, 10),
+			200, 60000, 10, 3600*24),
 		HandleHealth,
 	)
 
@@ -97,7 +97,7 @@ var testHandlersSet []gin.HandlerFunc = []gin.HandlerFunc{
 	CreateDatastoreBackedLimitter(dsClient,
 		DatastoreKindRequestTracker,
 		GetUserIdFromContextByField("userId"),
-		200, 60000, 10),
+		200, 60000, 10, 3600*24),
 	HandleHealth,
 }
 
@@ -112,7 +112,7 @@ func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 		CreateDatastoreBackedLimitter(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField("userId"),
-			200, 60000, 10),
+			200, 60000, 10, 3600*24),
 		HandleHealth,
 	)
 
@@ -127,7 +127,7 @@ func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 		CreateDatastoreBackedLimitter(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField("userId"),
-			200, 60000, 10),
+			200, 60000, 10, 3600*24),
 		HandleHealth,
 	)
 
@@ -144,7 +144,7 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
 		CreateDatastoreBackedLimitter(dsClient, DatastoreKindRequestTracker, GetUserIdFromContextByField("userId"),
-			interval, 0, 0),
+			interval, 0, 0, 3600*24),
 		HandleHealth,
 	)
 
@@ -161,7 +161,7 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 		CreateDatastoreBackedLimitter(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField("userId"),
-			interval, 0, 0),
+			interval, 0, 0, 3600*24),
 		HandleHealth,
 	)
 
@@ -174,7 +174,7 @@ func TestLimitter_TooFrequentlyRequests_ResponseError(t *testing.T) {
 	interval := int64(10)
 	limitter := CreateDatastoreBackedLimitter(dsClient, DatastoreKindRequestTracker,
 		GetUserIdFromContextByField("userId"),
-		interval, 10000, 1)
+		interval, 10000, 1, 3600*24)
 	authHandler := CreateFakeAuthenticationHandler(FieldNameUserId, userId)
 	recorder := RecordRequest(http.MethodGet,
 		"/health",
@@ -206,7 +206,7 @@ func TestLimitterTooFreequently_NewWindow_RequestSuccess(t *testing.T) {
 	windowSize := int64(1000)
 	limitter := CreateDatastoreBackedLimitter(dsClient, DatastoreKindRequestTracker,
 		GetUserIdFromContextByField("userId"),
-		interval, windowSize, 1)
+		interval, windowSize, 1, 3600*24)
 	authHandler := CreateFakeAuthenticationHandler(FieldNameUserId, userId)
 
 	recorder := RecordRequest(http.MethodGet,
@@ -245,8 +245,10 @@ func TestLimitterTooFreequently_NewWindow_RequestSuccess(t *testing.T) {
 
 // go test -timeout 30s -run ^TestUpdateTracker_WindowsIncreased$ github.com/zeroboo/gin-request-limitter -v
 func TestUpdateTracker_WindowsIncreased(t *testing.T) {
-	var tracker RequestTracker = *CreateRequestTracker("uid", "url", time.Now().Add(100*time.Second))
-	//tracker.UpdateRequest(time.Now)
+	var tracker *RequestTracker = CreateNewRequestTracker("uid", "url", time.Now().Add(100*time.Second))
+	config := &LimitterConfig{}
+	tracker.UpdateRequest(time.Now(), config)
+	log.Infof("Tracker: %v", tracker)
 }
 
 // CreateRequest return a forged http request

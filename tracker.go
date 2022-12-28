@@ -1,6 +1,9 @@
 package limitter
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // ----------------------------------------------------------------------------------------------------
 type RequestTracker struct {
@@ -21,7 +24,7 @@ type RequestTracker struct {
 
 const DefaultREquestTrackingWindowMilis int64 = 60000
 
-func CreateRequestTracker(uid string, url string, expiration time.Time) *RequestTracker {
+func CreateNewRequestTracker(uid string, url string, expiration time.Time) *RequestTracker {
 	var tracker RequestTracker = RequestTracker{
 		UID:           uid,
 		URL:           url,
@@ -43,14 +46,23 @@ func (tracker *RequestTracker) UpdateWindow(currentTime time.Time, windowMilis i
 	}
 }
 
-func (tracker *RequestTracker) UpdateRequest(currentTime time.Time, windowFrameMilis int64, expiration time.Time) {
-	if windowFrameMilis > 0 {
-		tracker.UpdateWindow(currentTime, windowFrameMilis)
+func (tracker *RequestTracker) String() string {
+	return fmt.Sprintf("Tracker|UID:%v|URL:%v|CallElapse:%v|Window:%v-%v",
+		tracker.UID,
+		tracker.URL,
+		time.Since(time.Unix(tracker.LastCall, 0)),
+		tracker.WindowNum, tracker.WindowRequest,
+	)
+}
+
+func (tracker *RequestTracker) UpdateRequest(currentTime time.Time, config *LimitterConfig) {
+	if config.WindowSize > 0 {
+		tracker.UpdateWindow(currentTime, config.WindowSize)
 		tracker.WindowRequest += 1
 	}
 
 	tracker.LastCall = currentTime.UnixMilli()
-	tracker.Expiration = expiration
+	tracker.Expiration = config.CreateExpiration(currentTime)
 }
 
 func (tracker *RequestTracker) IsRequestTooFast(currentTime time.Time, requestMinIntervalMilis int64) bool {
