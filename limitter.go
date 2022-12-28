@@ -54,7 +54,7 @@ func ValidateRequest(tracker *RequestTracker,
 	currentTime time.Time,
 	requestURL string,
 	requestClientIP string,
-	limitterConfig LimitterConfig) error {
+	limitterConfig *LimitterConfig) error {
 
 	if limitterConfig.MinRequestInterval > 0 {
 		if tracker.IsRequestTooFast(currentTime, limitterConfig.MinRequestInterval) {
@@ -64,7 +64,7 @@ func ValidateRequest(tracker *RequestTracker,
 	}
 
 	//log.Printf("WindowSize=%v, callLimit=%v", limitterConfig.WindowSize, limitterConfig.WindowRequestMax)
-	tracker.UpdateRequest(time.Now(), &limitterConfig)
+	tracker.UpdateRequest(time.Now(), limitterConfig)
 
 	if limitterConfig.WindowSize > 0 {
 		if tracker.IsRequestTooFrequently(currentTime, limitterConfig.MaxRequestPerWindow) {
