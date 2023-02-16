@@ -107,6 +107,15 @@ func LoadUserTracker(Client *datastore.Client, TrackerKind string, URL string, U
 	trackerKey := datastore.NameKey(TrackerKind, trackerName, nil)
 	errTracker := Client.Get(context.TODO(), trackerKey, &tracker)
 
+	if errTracker != nil {
+		_, ok := errTracker.(*datastore.ErrFieldMismatch)
+		if ok {
+			errTracker = nil
+			log.Warnf("LoadUserTracker: TypeMisMatch, kind=%v, url=%v, userId=%v, error=%v",
+				TrackerKind, URL, UserId, errTracker)
+		}
+	}
+
 	return trackerKey, &tracker, errTracker
 }
 
