@@ -39,9 +39,10 @@ type LimitterConfig struct {
 
 	//If true, error when save/load tracker will abort request
 	//If false, request will be served even if save/load tracker error
-	AbortOnTrackerFailed bool
+	AbortOnFail bool
 
-	SessionExpirationSeconds int64
+	//ExpSec is sesion expiration in seconds
+	ExpSec int64
 }
 
 var ErrorRequestTooFast = fmt.Errorf("request is too fast")
@@ -113,8 +114,8 @@ const DefaultSessionExpirationSeconds int64 = 3600
 
 func (config *LimitterConfig) CreateExpiration(Now time.Time) time.Time {
 	var expSec int64 = DefaultSessionExpirationSeconds
-	if config.SessionExpirationSeconds > 0 {
-		expSec = config.SessionExpirationSeconds
+	if config.ExpSec > 0 {
+		expSec = config.ExpSec
 	}
 
 	return Now.Add(time.Duration(expSec) * time.Second)
@@ -208,17 +209,17 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 	maxRequestInWindow int,
 	sessionExpirationSeconds int64) func(c *gin.Context) {
 	config := LimitterConfig{
-		MinRequestInterval:       minRequestIntervalMilis,
-		WindowSize:               windowFrameMilis,
-		MaxRequestPerWindow:      int64(maxRequestInWindow),
-		SessionExpirationSeconds: sessionExpirationSeconds,
+		MinRequestInterval:  minRequestIntervalMilis,
+		WindowSize:          windowFrameMilis,
+		MaxRequestPerWindow: int64(maxRequestInWindow),
+		ExpSec:              sessionExpirationSeconds,
 	}
 	log.Infof("CreateDatastoreBackedLimitter: DatastoreKind=%v, minRequestInterval=%v, WindowsSize=%v, MaxRequestPerWindow=%v, SessionExpirationSeconds=%v",
 		trackerKind,
 		config.MinRequestInterval,
 		config.WindowSize,
 		config.MaxRequestPerWindow,
-		config.SessionExpirationSeconds,
+		config.ExpSec,
 	)
 
 	return CreateDatastoreBackedLimitterFromConfig(client, trackerKind, getUserIdFromContext, &config)
