@@ -1,4 +1,4 @@
-SET VERSION=v0.1.4
+SET VERSION=v0.1.5
 
 
 git tag %VERSION%
