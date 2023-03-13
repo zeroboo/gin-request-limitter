@@ -104,15 +104,18 @@ var testHandlersSet []gin.HandlerFunc = []gin.HandlerFunc{
 // go test -timeout 30s -run ^TestLimitter_MultiRequestTooFast_ResponseError$ github.com/zeroboo/gin-request-limitter -v
 func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 	userId := "test-too-fast"
+
+	var minimumIntervalMilisecs int64 = 500
+	url := "/health"
 	recorder := RecordRequest(http.MethodGet,
-		"/health",
+		url,
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
 		CreateDatastoreBackedLimitter(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField("userId"),
-			200, 60000, 10, 3600*24),
+			minimumIntervalMilisecs, 60000, 10, 3600*24),
 		HandleHealth,
 	)
 
@@ -120,18 +123,26 @@ func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 	assert.Equal(t, "OK", recorder.Body.String(), "First response body OK")
 
 	recorder2 := RecordRequest(http.MethodGet,
-		"/health",
+		url,
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
 		CreateDatastoreBackedLimitter(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField("userId"),
-			200, 60000, 10, 3600*24),
+			minimumIntervalMilisecs, 60000, 10, 3600*24),
 		HandleHealth,
 	)
 
 	assert.Equal(t, http.StatusTooEarly, recorder2.Code, "Second response's code is too early ")
+
+	//Test tracker
+	key, tracker, err := LoadUserTracker(dsClient, DatastoreKindRequestTracker, url, userId)
+	assert.Equal(t, err, nil, "Load tracker no error")
+	assert.Equal(t, "/test_request_trackers,cda5c99c0242bc5b3a0ecf309c672d14b24683f0", fmt.Sprintf("%v", key), "Correct key")
+	assert.Equal(t, url, tracker.URL, "Correct url")
+	assert.Equal(t, int64(1), tracker.WindowRequest, "Correct calls")
+
 }
 
 // go test -timeout 30s -run ^TestLimitter_MultiRequestNotTooFast_Success$ github.com/zeroboo/gin-request-limitter -v

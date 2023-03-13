@@ -22,7 +22,7 @@ type RequestTracker struct {
 	Expiration time.Time
 }
 
-const DefaultREquestTrackingWindowMilis int64 = 60000
+const DefaultRequestTrackingWindowMilis int64 = 60000
 
 func CreateNewRequestTracker(uid string, url string, expiration time.Time) *RequestTracker {
 	var tracker RequestTracker = RequestTracker{
@@ -47,10 +47,11 @@ func (tracker *RequestTracker) UpdateWindow(currentTime time.Time, windowMilis i
 }
 
 func (tracker *RequestTracker) String() string {
-	return fmt.Sprintf("Tracker|UID:%v|URL:%v|CallElapse:%v|Window:%v-%v",
+	return fmt.Sprintf("UID:%v|URL:%v|Interval:%v|LastCall:%v|Window:%v:%v",
 		tracker.UID,
 		tracker.URL,
-		time.Since(time.Unix(tracker.LastCall, 0)),
+		time.Since(time.UnixMilli(tracker.LastCall)).Milliseconds(),
+		tracker.LastCall,
 		tracker.WindowNum, tracker.WindowRequest,
 	)
 }

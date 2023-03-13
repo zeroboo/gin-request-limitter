@@ -57,6 +57,7 @@ func ValidateRequest(tracker *RequestTracker,
 	requestClientIP string,
 	limitterConfig *LimitterConfig) error {
 
+	log.Infof("ValidateRequest: Current=%v, lastCall=%v, passed=%v, minInterval=%v", currentTime.UnixMilli(), tracker.LastCall, currentTime.UnixMilli()-tracker.LastCall, limitterConfig.MinRequestInterval)
 	if limitterConfig.MinRequestInterval > 0 {
 		if tracker.IsRequestTooFast(currentTime, limitterConfig.MinRequestInterval) {
 			//log.Infof("InvalidRequest: TooFast, ID=%v, url=%v, IP=%v, elapse=%v", tracker.UID, requestURL, requestClientIP, currentTime.UnixMilli()-tracker.LastCall)
@@ -65,7 +66,7 @@ func ValidateRequest(tracker *RequestTracker,
 	}
 
 	//log.Printf("WindowSize=%v, callLimit=%v", limitterConfig.WindowSize, limitterConfig.WindowRequestMax)
-	tracker.UpdateRequest(time.Now(), limitterConfig)
+	tracker.UpdateRequest(currentTime, limitterConfig)
 
 	if limitterConfig.WindowSize > 0 {
 		if tracker.IsRequestTooFrequently(currentTime, limitterConfig.MaxRequestPerWindow) {
@@ -132,62 +133,71 @@ func (config *LimitterConfig) CreateExpiration(Now time.Time) time.Time {
 func CreateDatastoreBackedLimitterFromConfig(client *datastore.Client, trackerKind string,
 	getUserIdFromContext func(c *gin.Context) string,
 	config *LimitterConfig) func(c *gin.Context) {
+
 	return func(c *gin.Context) {
 		// Sets the name/ID for the new entity.
 		userId := getUserIdFromContext(c)
 		url := c.Request.URL.Path
+		currentTime := time.Now()
+		tracker := &RequestTracker{}
+		trackerName := CreateTrackerName(userId, url)
+		trackerKey := datastore.NameKey(trackerKind, trackerName, nil)
 
-		//Load tracker
-		trackerKey, tracker, errTracker := LoadUserTracker(client, trackerKind, url, userId)
-		var errValidate error
-		if errTracker != nil {
-			if errTracker == datastore.ErrNoSuchEntity {
-				//This error it not critical, bypass it
-				errTracker = nil
+		_, err := client.RunInTransaction(c.Request.Context(), func(tx *datastore.Transaction) error {
 
-				//Handle error: No session found, create new
-				tracker = CreateNewRequestTracker(userId, url, config.CreateExpiration(time.Now()))
-
+			errTracker := tx.Get(trackerKey, tracker)
+			if errTracker != nil {
+				_, isErrorFieldMismatch := errTracker.(*datastore.ErrFieldMismatch)
+				if isErrorFieldMismatch {
+					errTracker = nil
+					if log.IsLevelEnabled(log.TraceLevel) {
+						log.Tracef("LoadUserTracker: TypeMisMatch, kind=%v, url=%v, userId=%v, error=%v",
+							trackerKind, url, userId, errTracker)
+					}
+				} else if errors.Is(errTracker, datastore.ErrNoSuchEntity) {
+					errTracker = nil
+					tracker = CreateNewRequestTracker(userId, url, config.CreateExpiration(currentTime))
+					if log.IsLevelEnabled(log.TraceLevel) {
+						log.Tracef("LoadUserTracker: NotFound, kind=%v, url=%v, userId=%v, error=%v",
+							trackerKind, url, userId, errTracker)
+					}
+				} else {
+					//It's critical
+					log.Errorf("LoadUserTracker: Failed, kind=%v, url=%v, userId=%v, error=%v",
+						trackerKind, url, userId, errTracker)
+					return errTracker
+				}
+			} else {
 				if log.IsLevelEnabled(log.TraceLevel) {
-					log.Tracef("RequestLimitter: TrackerNotFound, UID=%v, url=%v, key=%v", userId, url, trackerKey)
+					log.Tracef("RequestLimitter: TrackerLoaded, key=%v, tracker=%v", trackerKey, tracker)
 				}
 			}
-		}
 
-		if errTracker == nil {
-			// if log.IsLevelEnabled(log.TraceLevel) {
-			// 	log.Tracef("RequestLimitter: LoadedTracker=%v", tracker)
-			// }
-			errValidate = ValidateRequest(tracker, time.Now(), url, c.ClientIP(), config)
-		} else {
-			//Error occur, log error and quit tracker
-			log.Errorf("RequestLimitter: LoadTrackerFailed, UID=%v, url=%v, key=%v, error=%v", userId, url, trackerKey, errTracker)
-			c.Next()
-			return
-		}
-
-		var savedKey *datastore.Key
-		if errValidate == nil {
-			savedKey, errTracker = client.Put(context.Background(), trackerKey, tracker)
-			if errTracker != nil {
-				log.Errorf("RequestLimitter: UpdateTrackerFailed, UID=%v, key=%v, error=%v", userId, trackerKey, errTracker)
-				c.Next()
-				return
+			errValidate := ValidateRequest(tracker, currentTime, url, c.ClientIP(), config)
+			if errValidate != nil {
+				return errValidate
 			}
 
-		}
-		processValidateResult(errValidate, c)
+			_, errTracker = tx.Put(trackerKey, tracker)
+			if errTracker != nil {
+				log.Errorf("RequestLimitter: UpdateTrackerFailed, UID=%v, key=%v, error=%v", userId, trackerKey, errTracker)
+				return errTracker
+			}
+
+			return nil
+		})
+
+		processValidateResult(err, c)
 
 		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Tracef("RequestLimitter: ValidateFinish, UID=%v, url=%v, IP=%v, calls=%v|%v, window=%v/%v|%v, saved=%v, errValidate=%v, errTracker=%v",
+			log.Tracef("RequestLimitter: ValidateFinish, UID=%v, url=%v, IP=%v, calls=%v|%v, window=%v/%v|%v, key=%v, errValidate=%v",
 				tracker.UID,
 				url,
 				c.ClientIP(),
-				time.Now().UnixMilli()-tracker.LastCall, config.MinRequestInterval,
+				currentTime.UnixMilli()-tracker.LastCall, config.MinRequestInterval,
 				tracker.WindowRequest, config.MaxRequestPerWindow, tracker.WindowNum,
-				savedKey != nil,
-				errValidate,
-				errTracker,
+				trackerKey,
+				err,
 			)
 		}
 	}
@@ -223,7 +233,7 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 		MaxRequestPerWindow: int64(maxRequestInWindow),
 		ExpSec:              sessionExpirationSeconds,
 	}
-	log.Infof("CreateDatastoreBackedLimitter: DatastoreKind=%v, minRequestInterval=%v, WindowsSize=%v, MaxRequestPerWindow=%v, SessionExpirationSeconds=%v",
+	log.Infof("CreateDatastoreBackedLimitter: DatastoreKind=%v, minRequestIntervalMilis=%v, WindowsSize=%v, MaxRequestPerWindow=%v, SessionExpirationSeconds=%v",
 		trackerKind,
 		config.MinRequestInterval,
 		config.WindowSize,
