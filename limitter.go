@@ -57,7 +57,7 @@ func ValidateRequest(tracker *RequestTracker,
 	requestClientIP string,
 	limitterConfig *LimitterConfig) error {
 
-	log.Infof("ValidateRequest: Current=%v, lastCall=%v, passed=%v, minInterval=%v", currentTime.UnixMilli(), tracker.LastCall, currentTime.UnixMilli()-tracker.LastCall, limitterConfig.MinRequestInterval)
+	//log.Infof("ValidateRequest: Current=%v, lastCall=%v, passed=%v, minInterval=%v", currentTime.UnixMilli(), tracker.LastCall, currentTime.UnixMilli()-tracker.LastCall, limitterConfig.MinRequestInterval)
 	if limitterConfig.MinRequestInterval > 0 {
 		if tracker.IsRequestTooFast(currentTime, limitterConfig.MinRequestInterval) {
 			//log.Infof("InvalidRequest: TooFast, ID=%v, url=%v, IP=%v, elapse=%v", tracker.UID, requestURL, requestClientIP, currentTime.UnixMilli()-tracker.LastCall)
@@ -78,8 +78,8 @@ func ValidateRequest(tracker *RequestTracker,
 	return nil
 }
 
-// processValidateResult aborts gin context if there is an error, let gin context run otherwise
-func processValidateResult(validateError error, c *gin.Context) {
+// ProcessValidateResult aborts gin context if there is an error, let gin context run otherwise
+func ProcessValidateResult(validateError error, c *gin.Context) {
 	if validateError == nil {
 		c.Next()
 	} else if errors.Is(validateError, ErrorRequestTooFast) {

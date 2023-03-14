@@ -7,28 +7,39 @@ import (
 
 // ----------------------------------------------------------------------------------------------------
 type RequestTracker struct {
-	UID string
-	URL string
+	UID string `redis:"uid" datastore:"uid"`
+	URL string `redis:"url" datastore:"url"`
 
 	//WindowNum is index of current window
-	WindowNum int64
+	WindowNum int64 `redis:"winNum" datastore:"winNum"`
 
 	//WindowRequest is calls of request in current window
-	WindowRequest int64
+	WindowRequest int64 `redis:"winReq" datastore:"winReq"`
 	//Last time request in millisec
-	LastCall int64
+	LastCall int64 `redis:"last" datastore:"last"`
 
-	//Expiration is time when this tracker expired
-	Expiration time.Time
+	//Exp is expiration of this tracker as unix millisecond
+	Exp int64 `redis:"exp" datastore:"exp"`
 }
 
 const DefaultRequestTrackingWindowMilis int64 = 60000
 
-func CreateNewRequestTracker(uid string, url string, expiration time.Time) *RequestTracker {
+func NewRequestTrackerWithExpiration(uid string, url string, expiration time.Time) *RequestTracker {
 	var tracker RequestTracker = RequestTracker{
 		UID:           uid,
 		URL:           url,
-		Expiration:    expiration,
+		Exp:           expiration.UnixMilli(),
+		LastCall:      0,
+		WindowNum:     0,
+		WindowRequest: 0,
+	}
+	return &tracker
+}
+func NewRequestTracker(uid string, url string) *RequestTracker {
+	var tracker RequestTracker = RequestTracker{
+		UID:           uid,
+		URL:           url,
+		Exp:           0,
 		LastCall:      0,
 		WindowNum:     0,
 		WindowRequest: 0,
@@ -63,7 +74,7 @@ func (tracker *RequestTracker) UpdateRequest(currentTime time.Time, config *Limi
 	}
 
 	tracker.LastCall = currentTime.UnixMilli()
-	tracker.Expiration = config.CreateExpiration(currentTime)
+	tracker.Exp = config.CreateExpiration(currentTime).UnixMilli()
 }
 
 func (tracker *RequestTracker) IsRequestTooFast(currentTime time.Time, requestMinIntervalMilis int64) bool {

@@ -13,20 +13,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func CreateDatastoreBackedLimitterFromConfig(client *datastore.Client, trackerKind string,
-	getUserIdFromContext func(c *gin.Context) string,
-	config *LimitterConfig) func(c *gin.Context) {
+func CreateDatastoreBackedLimitterFromConfig(pClient *datastore.Client, pTrackerKind string,
+	pUserIdExtractor func(c *gin.Context) string,
+	pConfig *LimitterConfig) func(c *gin.Context) {
 
 	return func(c *gin.Context) {
 		// Sets the name/ID for the new entity.
-		userId := getUserIdFromContext(c)
+		userId := pUserIdExtractor(c)
 		url := c.Request.URL.Path
 		currentTime := time.Now()
 		tracker := &RequestTracker{}
 		trackerName := CreateTrackerName(userId, url)
-		trackerKey := datastore.NameKey(trackerKind, trackerName, nil)
+		trackerKey := datastore.NameKey(pTrackerKind, trackerName, nil)
 
-		_, err := client.RunInTransaction(c.Request.Context(), func(tx *datastore.Transaction) error {
+		_, err := pClient.RunInTransaction(c.Request.Context(), func(tx *datastore.Transaction) error {
 
 			errTracker := tx.Get(trackerKey, tracker)
 			if errTracker != nil {
@@ -35,19 +35,19 @@ func CreateDatastoreBackedLimitterFromConfig(client *datastore.Client, trackerKi
 					errTracker = nil
 					if log.IsLevelEnabled(log.TraceLevel) {
 						log.Tracef("LoadUserTracker: TypeMisMatch, kind=%v, url=%v, userId=%v, error=%v",
-							trackerKind, url, userId, errTracker)
+							pTrackerKind, url, userId, errTracker)
 					}
 				} else if errors.Is(errTracker, datastore.ErrNoSuchEntity) {
 					errTracker = nil
-					tracker = CreateNewRequestTracker(userId, url, config.CreateExpiration(currentTime))
+					tracker = NewRequestTrackerWithExpiration(userId, url, pConfig.CreateExpiration(currentTime))
 					if log.IsLevelEnabled(log.TraceLevel) {
 						log.Tracef("LoadUserTracker: NotFound, kind=%v, url=%v, userId=%v, error=%v",
-							trackerKind, url, userId, errTracker)
+							pTrackerKind, url, userId, errTracker)
 					}
 				} else {
 					//It's critical
 					log.Errorf("LoadUserTracker: Failed, kind=%v, url=%v, userId=%v, error=%v",
-						trackerKind, url, userId, errTracker)
+						pTrackerKind, url, userId, errTracker)
 					return errTracker
 				}
 			} else {
@@ -56,7 +56,7 @@ func CreateDatastoreBackedLimitterFromConfig(client *datastore.Client, trackerKi
 				}
 			}
 
-			errValidate := ValidateRequest(tracker, currentTime, url, c.ClientIP(), config)
+			errValidate := ValidateRequest(tracker, currentTime, url, c.ClientIP(), pConfig)
 			if errValidate != nil {
 				return errValidate
 			}
@@ -70,15 +70,15 @@ func CreateDatastoreBackedLimitterFromConfig(client *datastore.Client, trackerKi
 			return nil
 		})
 
-		processValidateResult(err, c)
+		ProcessValidateResult(err, c)
 
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("RequestLimitter: ValidateFinish, UID=%v, url=%v, IP=%v, calls=%v|%v, window=%v/%v|%v, key=%v, errValidate=%v",
 				tracker.UID,
 				url,
 				c.ClientIP(),
-				currentTime.UnixMilli()-tracker.LastCall, config.MinRequestInterval,
-				tracker.WindowRequest, config.MaxRequestPerWindow, tracker.WindowNum,
+				currentTime.UnixMilli()-tracker.LastCall, pConfig.MinRequestInterval,
+				tracker.WindowRequest, pConfig.MaxRequestPerWindow, tracker.WindowNum,
 				trackerKey,
 				err,
 			)
