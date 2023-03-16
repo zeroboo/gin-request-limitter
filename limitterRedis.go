@@ -80,10 +80,9 @@ func CreateRedisBackedLimitterFromConfig(pUserIdExtractor func(c *gin.Context) s
 		}
 
 		errValidate := ValidateRequest(tracker, currentTime, url, c.ClientIP(), pConfig)
-		log.Infof("TrackerAfter: %v", tracker)
-		if log.IsLevelEnabled(log.TraceLevel) {
-			log.Errorf("RedisLimitter: TrackerAfter=%v", tracker)
-		}
+		// if log.IsLevelEnabled(log.TraceLevel) {
+		// 	log.Tracef("TrackerAfter: %v", tracker)
+		// }
 
 		errSetTracker := SaveRedisRequestTracker(c.Request.Context(), rdb, tracker, pConfig.ExpSec)
 		if errValidate == nil {
@@ -92,7 +91,7 @@ func CreateRedisBackedLimitterFromConfig(pUserIdExtractor func(c *gin.Context) s
 				errValidate = errSetTracker
 			}
 		} else {
-			log.Errorf("RedisLimitter: ValidateTrackerFailed, userId=%v, key=%v, error=%v", userId, trackerKey, errValidate)
+			log.Errorf("RedisLimitter: ValidateTrackerFailed, userId=%v, key=%v, error=%v", userId, trackerKey, tracker.LastCall, errValidate)
 		}
 
 		if log.IsLevelEnabled(log.TraceLevel) {
