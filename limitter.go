@@ -79,9 +79,12 @@ func ValidateRequest(tracker *RequestTracker,
 }
 
 // ProcessValidateResult aborts gin context if there is an error, let gin context run otherwise
-func ProcessValidateResult(validateError error, c *gin.Context) {
+func ProcessValidateResult(validateError error, c *gin.Context, isMiddleware bool) {
 	if validateError == nil {
-		c.Next()
+		if isMiddleware {
+			c.Next()
+		}
+
 	} else if errors.Is(validateError, ErrorRequestTooFast) {
 		c.AbortWithStatus(http.StatusTooEarly)
 	} else if errors.Is(validateError, ErrorRequestTooFreequently) {
@@ -148,7 +151,7 @@ Params:
 
   - maxRequestInWindow: Max request in a window frame
 */
-func CreateDatastoreBackedLimitter(client *datastore.Client,
+func CreateDatastoreBackedLimitterHandler(client *datastore.Client,
 	trackerKind string,
 	getUserIdFromContext func(c *gin.Context) string,
 	minRequestIntervalMilis int64,
@@ -169,7 +172,48 @@ func CreateDatastoreBackedLimitter(client *datastore.Client,
 		config.ExpSec,
 	)
 
-	return CreateDatastoreBackedLimitterFromConfig(client, trackerKind, getUserIdFromContext, &config)
+	return CreateDatastoreBackedLimitterFromConfig(client, trackerKind, getUserIdFromContext, &config, false)
+}
+
+/*
+CreateDatastoreBackedLimitter returns a limitter with given config as middleware.
+
+Limitter aborts gin context if validating failed.
+If limitter has internal error, it will leaves the context run by calling c.Next()
+Params:
+
+  - trackerKind: Kind of tracker in datastore
+
+  - GetUserIdFromContext: Function to extract userid from a gin context
+
+  - minRequestIntervalMilis: Minimum time between 2 requests, 0 means no limit
+
+  - windowFrameMilis: Window frame in miliseconds, 0 means no limit
+
+  - maxRequestInWindow: Max request in a window frame
+*/
+func CreateDatastoreBackedLimitterMiddleware(client *datastore.Client,
+	trackerKind string,
+	getUserIdFromContext func(c *gin.Context) string,
+	minRequestIntervalMilis int64,
+	windowFrameMilis int64,
+	maxRequestInWindow int,
+	sessionExpirationSeconds int64) func(c *gin.Context) {
+	config := LimitterConfig{
+		MinRequestInterval:  minRequestIntervalMilis,
+		WindowSize:          windowFrameMilis,
+		MaxRequestPerWindow: int64(maxRequestInWindow),
+		ExpSec:              sessionExpirationSeconds,
+	}
+	log.Infof("CreateDatastoreBackedLimitter: DatastoreKind=%v, minRequestIntervalMilis=%v, WindowsSize=%v, MaxRequestPerWindow=%v, SessionExpirationSeconds=%v",
+		trackerKind,
+		config.MinRequestInterval,
+		config.WindowSize,
+		config.MaxRequestPerWindow,
+		config.ExpSec,
+	)
+
+	return CreateDatastoreBackedLimitterFromConfig(client, trackerKind, getUserIdFromContext, &config, true)
 }
 
 // ValidateGinRequest

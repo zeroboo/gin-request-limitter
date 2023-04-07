@@ -26,7 +26,7 @@ func TestLimitter_ValidGETRequest_Correct(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, "testUser"),
-		CreateDatastoreBackedLimitter(dsClient,
+		CreateDatastoreBackedLimitterHandler(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField(FieldNameUserId),
 			200, 60000, 10, 3600*24),
@@ -39,7 +39,7 @@ func TestLimitter_ValidGETRequest_Correct(t *testing.T) {
 
 var testHandlersSet []gin.HandlerFunc = []gin.HandlerFunc{
 	CreateFakeAuthenticationHandler(FieldNameUserId, "testUser"),
-	CreateDatastoreBackedLimitter(dsClient,
+	CreateDatastoreBackedLimitterHandler(dsClient,
 		DatastoreKindRequestTracker,
 		GetUserIdFromContextByField("userId"),
 		200, 60000, 10, 3600*24),
@@ -50,14 +50,14 @@ var testHandlersSet []gin.HandlerFunc = []gin.HandlerFunc{
 func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 	userId := "test-too-fast"
 
-	var minimumIntervalMilisecs int64 = 500
+	var minimumIntervalMilisecs int64 = 1000
 	url := "/health"
 	recorder := RecordRequest(http.MethodGet,
 		url,
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateDatastoreBackedLimitter(dsClient,
+		CreateDatastoreBackedLimitterHandler(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField("userId"),
 			minimumIntervalMilisecs, 60000, 10, 3600*24),
@@ -72,7 +72,7 @@ func TestLimitter_MultiRequestTooFast_ResponseError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateDatastoreBackedLimitter(dsClient,
+		CreateDatastoreBackedLimitterHandler(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField("userId"),
 			minimumIntervalMilisecs, 60000, 10, 3600*24),
@@ -99,7 +99,7 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateDatastoreBackedLimitter(dsClient, DatastoreKindRequestTracker, GetUserIdFromContextByField("userId"),
+		CreateDatastoreBackedLimitterHandler(dsClient, DatastoreKindRequestTracker, GetUserIdFromContextByField("userId"),
 			interval, 0, 0, 3600*24),
 		HandleHealth,
 	)
@@ -114,7 +114,7 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateDatastoreBackedLimitter(dsClient,
+		CreateDatastoreBackedLimitterHandler(dsClient,
 			DatastoreKindRequestTracker,
 			GetUserIdFromContextByField("userId"),
 			interval, 0, 0, 3600*24),
@@ -128,7 +128,7 @@ func TestLimitter_MultiRequestNotTooFast_Success(t *testing.T) {
 func TestLimitter_TooFrequentlyRequests_ResponseError(t *testing.T) {
 	userId := fmt.Sprintf("test-too-fast-%v", time.Now().Unix())
 	interval := int64(10)
-	limitter := CreateDatastoreBackedLimitter(dsClient, DatastoreKindRequestTracker,
+	limitter := CreateDatastoreBackedLimitterHandler(dsClient, DatastoreKindRequestTracker,
 		GetUserIdFromContextByField("userId"),
 		interval, 10000, 1, 3600*24)
 	authHandler := CreateFakeAuthenticationHandler(FieldNameUserId, userId)
@@ -160,7 +160,7 @@ func TestLimitterTooFreequently_NewWindow_RequestSuccess(t *testing.T) {
 	userId := fmt.Sprintf("test-too-fast-%v", time.Now().Unix())
 	interval := int64(10)
 	windowSize := int64(1000)
-	limitter := CreateDatastoreBackedLimitter(dsClient, DatastoreKindRequestTracker,
+	limitter := CreateDatastoreBackedLimitterHandler(dsClient, DatastoreKindRequestTracker,
 		GetUserIdFromContextByField("userId"),
 		interval, windowSize, 1, 3600*24)
 	authHandler := CreateFakeAuthenticationHandler(FieldNameUserId, userId)

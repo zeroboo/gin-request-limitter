@@ -62,7 +62,7 @@ func SaveRedisRequestTracker(ctx context.Context, rClient *redis.Client, tracker
 }
 
 func CreateRedisBackedLimitterFromConfig(pUserIdExtractor func(c *gin.Context) string,
-	pConfig *LimitterConfig) func(c *gin.Context) {
+	pConfig *LimitterConfig, pIsMiddleware bool) func(c *gin.Context) {
 
 	return func(c *gin.Context) {
 
@@ -95,6 +95,7 @@ func CreateRedisBackedLimitterFromConfig(pUserIdExtractor func(c *gin.Context) s
 				userId, trackerKey, currentTime.UnixMilli()-tracker.LastCall, errValidate)
 		}
 
+		ProcessValidateResult(errValidate, c, pIsMiddleware)
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("RequestLimitter: ValidateFinish, UID=%v, url=%v, IP=%v, calls=%v|%v, window=%v/%v|%v, key=%v, errValidate=%v",
 				tracker.UID,
@@ -106,7 +107,5 @@ func CreateRedisBackedLimitterFromConfig(pUserIdExtractor func(c *gin.Context) s
 				errValidate,
 			)
 		}
-
-		ProcessValidateResult(errValidate, c)
 	}
 }

@@ -15,7 +15,8 @@ import (
 
 func CreateDatastoreBackedLimitterFromConfig(pClient *datastore.Client, pTrackerKind string,
 	pUserIdExtractor func(c *gin.Context) string,
-	pConfig *LimitterConfig) func(c *gin.Context) {
+	pConfig *LimitterConfig,
+	pIsMiddleware bool) func(c *gin.Context) {
 
 	return func(c *gin.Context) {
 		// Sets the name/ID for the new entity.
@@ -70,7 +71,7 @@ func CreateDatastoreBackedLimitterFromConfig(pClient *datastore.Client, pTracker
 			return nil
 		})
 
-		ProcessValidateResult(err, c)
+		ProcessValidateResult(err, c, pIsMiddleware)
 
 		if log.IsLevelEnabled(log.TraceLevel) {
 			log.Tracef("RequestLimitter: ValidateFinish, UID=%v, url=%v, IP=%v, calls=%v|%v, window=%v/%v|%v, key=%v, errValidate=%v",
