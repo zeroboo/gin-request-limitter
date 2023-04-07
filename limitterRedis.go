@@ -61,7 +61,7 @@ func SaveRedisRequestTracker(ctx context.Context, rClient *redis.Client, tracker
 	return errSetTracker
 }
 
-func CreateRedisBackedLimitterFromConfig(pUserIdExtractor func(c *gin.Context) string,
+func CreateRedisBackedLimitter(pUserIdExtractor func(c *gin.Context) string,
 	pConfig *LimitterConfig, pIsMiddleware bool) func(c *gin.Context) {
 
 	return func(c *gin.Context) {

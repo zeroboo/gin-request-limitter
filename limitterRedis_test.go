@@ -28,8 +28,8 @@ var limitterTestConfigShortWindow LimitterConfig = LimitterConfig{
 	MaxRequestPerWindow: 1,
 	ExpSec:              600,
 }
-var limitterHandlerShortWindow func(c *gin.Context) = CreateRedisBackedLimitterFromConfig(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfigShortWindow, false)
-var limitterHandlerLongWindow func(c *gin.Context) = CreateRedisBackedLimitterFromConfig(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfigLongWindow, false)
+var limitterHandlerShortWindow func(c *gin.Context) = CreateRedisBackedLimitter(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfigShortWindow, false)
+var limitterHandlerLongWindow func(c *gin.Context) = CreateRedisBackedLimitter(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfigLongWindow, false)
 
 // go.exe test -timeout 30s -run ^TestRedisLimitter_FirstRequest_HasError$ github.com/zeroboo/gin-request-limitter -v
 func TestRedisLimitter_FirstRequest_HasError(t *testing.T) {
@@ -39,7 +39,7 @@ func TestRedisLimitter_FirstRequest_HasError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateRedisBackedLimitterFromConfig(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
+		CreateRedisBackedLimitter(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
 		HandleHealth,
 	)
 
@@ -55,7 +55,7 @@ func TestRedisLimitter_RequestTooFast_HasError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateRedisBackedLimitterFromConfig(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
+		CreateRedisBackedLimitter(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
 		HandleHealth,
 	)
 	recorder2 := RecordRequest(http.MethodGet,
@@ -63,7 +63,7 @@ func TestRedisLimitter_RequestTooFast_HasError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateRedisBackedLimitterFromConfig(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
+		CreateRedisBackedLimitter(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
 		HandleHealth,
 	)
 
@@ -80,7 +80,7 @@ func TestRedisLimitter_MultipleRequestsObeyInterval_NoError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateRedisBackedLimitterFromConfig(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
+		CreateRedisBackedLimitter(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
 		HandleHealth,
 	)
 	assert.Equal(t, http.StatusOK, recorder.Code, "Response success")
@@ -92,7 +92,7 @@ func TestRedisLimitter_MultipleRequestsObeyInterval_NoError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateRedisBackedLimitterFromConfig(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
+		CreateRedisBackedLimitter(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
 		HandleHealth,
 	)
 	assert.Equal(t, http.StatusOK, recorder2.Code, "Response success")
@@ -104,7 +104,7 @@ func TestRedisLimitter_MultipleRequestsObeyInterval_NoError(t *testing.T) {
 		map[string][]string{},
 		map[string][]string{},
 		CreateFakeAuthenticationHandler(FieldNameUserId, userId),
-		CreateRedisBackedLimitterFromConfig(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
+		CreateRedisBackedLimitter(GetUserIdFromContextByField(FieldNameUserId), &limitterTestConfig, false),
 		HandleHealth,
 	)
 	assert.Equal(t, http.StatusOK, recorder3.Code, "Response success")

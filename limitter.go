@@ -172,7 +172,7 @@ func CreateDatastoreBackedLimitterHandler(client *datastore.Client,
 		config.ExpSec,
 	)
 
-	return CreateDatastoreBackedLimitterFromConfig(client, trackerKind, getUserIdFromContext, &config, false)
+	return CreateDatastoreBackedLimitter(client, trackerKind, getUserIdFromContext, &config, false)
 }
 
 /*
@@ -213,10 +213,47 @@ func CreateDatastoreBackedLimitterMiddleware(client *datastore.Client,
 		config.ExpSec,
 	)
 
-	return CreateDatastoreBackedLimitterFromConfig(client, trackerKind, getUserIdFromContext, &config, true)
+	return CreateDatastoreBackedLimitter(client, trackerKind, getUserIdFromContext, &config, true)
 }
 
-// ValidateGinRequest
-func ValidateGinRequest(userId string, url string, c *gin.Context) {
+func CreateRedisBackedLimitterHandler(getUserIdFromContext func(c *gin.Context) string,
+	minRequestIntervalMilis int64,
+	windowFrameMilis int64,
+	maxRequestInWindow int,
+	sessionExpirationSeconds int64) func(c *gin.Context) {
+	config := LimitterConfig{
+		MinRequestInterval:  minRequestIntervalMilis,
+		WindowSize:          windowFrameMilis,
+		MaxRequestPerWindow: int64(maxRequestInWindow),
+		ExpSec:              sessionExpirationSeconds,
+	}
+	log.Infof("CreateRedisBackedLimitterHandler: minRequestIntervalMilis=%v, WindowsSize=%v, MaxRequestPerWindow=%v, SessionExpirationSeconds=%v",
+		config.MinRequestInterval,
+		config.WindowSize,
+		config.MaxRequestPerWindow,
+		config.ExpSec,
+	)
 
+	return CreateRedisBackedLimitter(getUserIdFromContext, &config, false)
+}
+
+func CreateRedisBackedLimitterMiddleware(getUserIdFromContext func(c *gin.Context) string,
+	minRequestIntervalMilis int64,
+	windowFrameMilis int64,
+	maxRequestInWindow int,
+	sessionExpirationSeconds int64) func(c *gin.Context) {
+	config := LimitterConfig{
+		MinRequestInterval:  minRequestIntervalMilis,
+		WindowSize:          windowFrameMilis,
+		MaxRequestPerWindow: int64(maxRequestInWindow),
+		ExpSec:              sessionExpirationSeconds,
+	}
+	log.Infof("CreateRedisBackedLimitterMiddleware: minRequestIntervalMilis=%v, WindowsSize=%v, MaxRequestPerWindow=%v, SessionExpirationSeconds=%v",
+		config.MinRequestInterval,
+		config.WindowSize,
+		config.MaxRequestPerWindow,
+		config.ExpSec,
+	)
+
+	return CreateRedisBackedLimitter(getUserIdFromContext, &config, true)
 }

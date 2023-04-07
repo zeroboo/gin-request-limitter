@@ -13,7 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func CreateDatastoreBackedLimitterFromConfig(pClient *datastore.Client, pTrackerKind string,
+func CreateDatastoreBackedLimitter(pClient *datastore.Client, pTrackerKind string,
 	pUserIdExtractor func(c *gin.Context) string,
 	pConfig *LimitterConfig,
 	pIsMiddleware bool) func(c *gin.Context) {
