@@ -1,3 +1,4 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/zeroboo/gin-request-limitter)](https://goreportcard.com/report/github.com/zeroboo/gin-request-limitter)
 # gin-request-limitter
 Request limitter as middleware for gin-gonic framework: limit requests can be accepted of an user.
 
